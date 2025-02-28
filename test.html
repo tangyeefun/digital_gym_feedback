@@ -115,10 +115,10 @@
             const class2 = prediction.find(p => p.className === "Class 2");
             if (class2 && class2.probability === 1) {
                 class2Counter++;
-                if (class2Counter === 1) {
-                    document.getElementById("message-container").innerText = "Please hold this position for 3 seconds";
-                } else if (class2Counter >= holdTime * 60) { // assuming 60 frames per second
+                if (class2Counter >= holdTime * 60) { // assuming 60 frames per second
                     document.getElementById("message-container").innerText = "Good job!";
+                } else {
+                    document.getElementById("message-container").innerText = "Please hold this position for 3 seconds";
                 }
             } else {
                 class2Counter = 0; // reset counter if class 2 is not attained
