@@ -113,8 +113,10 @@
 
             // Check if class 2 has attained 1 point
             const class2 = prediction.find(p => p.className === "Class 2");
+            console.log(`Class 2 probability: ${class2 ? class2.probability : 0}`);
             if (class2 && class2.probability === 1) {
                 class2Counter++;
+                console.log(`Class 2 counter: ${class2Counter}`);
                 if (class2Counter >= holdTime * 60) { // assuming 60 frames per second
                     document.getElementById("message-container").innerText = "Good job!";
                 } else {
