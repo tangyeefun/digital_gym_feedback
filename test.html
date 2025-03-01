@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Main Page</title>
+    <title>Test Page</title>
     <style>
         /* Style for the body to centralize everything */
         body {
@@ -15,22 +15,162 @@
             margin: 0;
             text-align: center;
             padding: 10px; /* Add padding for better appearance on mobile */
+            background-color: aqua; /* Background color */
+            font-family: Georgia, serif; /* Font type */
         }
         /* Style for the title */
         .title {
-            font-size: 5vw; /* Responsive font size */
+            font-size: 32px; /* Font size */
         }
-        /* Style for the buttons */
-        button {
-            font-size: 4vw; /* Responsive font size */
-            padding: 10px 20px; /* Adjust padding for better appearance on mobile */
+        /* Style for the instruction */
+        .instruction {
+            font-size: 24px; /* Font size */
             margin-top: 20px; /* Add spacing below the title */
+        }
+        /* Style for the button */
+        button {
+            font-size: 24px; /* Font size */
+            padding: 10px 20px; /* Adjust padding for better appearance on mobile */
+            margin-top: 20px; /* Add spacing below the instruction */
+            margin-right: 10px; /* Add spacing between buttons */
+        }
+        /* Style for the messages */
+        .message {
+            font-size: 24px; /* Font size */
+            margin-top: 20px; /* Add spacing below the button */
+        }
+        /* Style for the canvas */
+        canvas {
+            margin-top: 20px; /* Add spacing below the button */
+            width: 100%; /* Make canvas responsive */
+            max-width: 400px; /* Limit the maximum width */
+            height: auto; /* Maintain aspect ratio */
+        }
+        /* Style for the subtitle */
+        .subtitle {
+            font-size: 28px; /* Font size */
+            margin-top: 20px; /* Add spacing below the canvas */
+            text-decoration: underline; /* Underline the subtitle */
+        }
+        /* Style for the pose instructions */
+        .pose-instruction {
+            font-size: 24px; /* Font size */
+            margin-top: 10px; /* Add spacing below the subtitle */
         }
     </style>
 </head>
 <body>
-    <div class="title">Welcome to Gymnastic Digital Feedback</div>
-    <button type="button" onclick="window.location.href='test.html'">Test</button>
-    <button type="button" onclick="window.location.href='singlepoint.html'">Single Point Balance</button>
+    <div class="title">Test Page</div>
+    <div class="instruction">Lift up your right hand</div>
+    <div>
+        <button type="button" onclick="init()">Start</button>
+        <button type="button" onclick="window.location.href='index.html'">Home</button>
+    </div>
+    <div style="display: flex; align-items: flex-start;">
+        <div style="margin-right: 20px;">
+            <div class="subtitle">Choose the pose</div>
+            <div class="pose-instruction">Pose 1: Raise up your right hand</div>
+            <div class="pose-instruction">Pose 2: Raise up your left hand</div>
+            <div class="pose-instruction">Enjoy the music!</div>
+        </div>
+        <div>
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+    <div id="label-container"></div>
+    <div id="message-container" class="message"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+    <script type="text/javascript">
+        // More API functions here:
+        // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/pose
+
+        // the link to your model provided by Teachable Machine export panel
+        const URL = "https://teachablemachine.withgoogle.com/models/aA_e3qnOX/";
+        let model, webcam, ctx, labelContainer, maxPredictions;
+        let pose2Audio = new Audio('audio/pose2.mp3');
+        let pose3Audio = new Audio('audio/pose3.mp3');
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // load the model and metadata
+            // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+            // Note: the pose library adds a tmPose object to your window (window.tmPose)
+            model = await tmPose.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Convenience function to setup a webcam
+            const size = 400;
+            const flip = true; // whether to flip the webcam
+            webcam = new tmPose.Webcam(size, size, flip); // width, height, flip
+            await webcam.setup(); // request access to the webcam
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // append/get elements to the DOM
+            const canvas = document.getElementById("canvas");
+            canvas.width = size; canvas.height = size;
+            ctx = canvas.getContext("2d");
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) { // and class labels
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop(timestamp) {
+            webcam.update(); // update the webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            // Prediction #1: run input through posenet
+            // estimatePose can take in an image, video or canvas html element
+            const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+            // Prediction 2: run input through teachable machine classification model
+            const prediction = await model.predict(posenetOutput);
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+
+            // Check if Pose 2 or Pose 3 has attained 0.80 to 1.00 points
+            const pose2 = prediction.find(p => p.className === "Pose 2");
+            const pose3 = prediction.find(p => p.className === "Pose 3");
+
+            if (pose2 && pose2.probability >= 0.80 && pose2.probability <= 1.00) {
+                pose2Audio.play();
+            } else {
+                pose2Audio.pause();
+                pose2Audio.currentTime = 0;
+            }
+
+            if (pose3 && pose3.probability >= 0.80 && pose3.probability <= 1.00) {
+                pose3Audio.play();
+            } else {
+                pose3Audio.pause();
+                pose3Audio.currentTime = 0;
+            }
+
+            // finally draw the poses
+            drawPose(pose);
+        }
+
+        function drawPose(pose) {
+            if (webcam.canvas) {
+                ctx.drawImage(webcam.canvas, 0, 0);
+                // draw the keypoints and skeleton
+                if (pose) {
+                    const minPartConfidence = 0.5;
+                    tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+                    tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+                }
+            }
+        }
+    </script>
 </body>
 </html>
