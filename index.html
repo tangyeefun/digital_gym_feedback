@@ -9,29 +9,33 @@
         body {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            align-items: flex-start; /* Align items to the left */
+            justify-content: flex-start; /* Align items to the top */
             height: 100vh;
             margin: 0;
-            text-align: center;
+            text-align: left; /* Align text to the left */
             padding: 10px; /* Add padding for better appearance on mobile */
+            background-color: white; /* Background color */
+            font-family: Georgia, serif; /* Font type */
         }
         /* Style for the title */
         .title {
-            font-size: 5vw; /* Responsive font size */
+            font-size: 32px; /* Font size */
         }
-        /* Style for the button */
+        /* Style for the buttons */
         button {
-            font-size: 4vw; /* Responsive font size */
+            font-size: 24px; /* Font size */
             padding: 10px 20px; /* Adjust padding for better appearance on mobile */
             margin-top: 20px; /* Add spacing below the title */
+            margin-right: 10px; /* Add spacing between buttons */
         }
     </style>
 </head>
 <body>
     <div class="title">Welcome to Gymnastic Digital Feedback</div>
-    <button type="button" onclick="window.location.href='test.html'">Test Page</button>
-    <button type="button" onclick="window.location.href='singlepoint.html'">Single Point Balance</button>
-
+    <div>
+        <button type="button" onclick="window.location.href='test.html'">Test Page</button>
+        <button type="button" onclick="window.location.href='singlepoint.html'">Single Point Balance</button>
+    </div>
 </body>
 </html>
