@@ -57,6 +57,12 @@
             font-size: 24px; /* Font size */
             margin-top: 10px; /* Add spacing below the subtitle */
         }
+        /* Style for the images */
+        .pose-image {
+            margin-top: 10px; /* Add spacing below the instruction */
+            max-width: 10%; /* Make image ten times smaller */
+            height: auto; /* Maintain aspect ratio */
+        }
     </style>
 </head>
 <body>
@@ -69,7 +75,9 @@
     <div style="display: flex; align-items: flex-start;">
         <div style="margin-right: 20px;">
             <div class="subtitle">Choose the pose</div>
+            <img src="tilt/pose2.jpeg" alt="Pose 1" class="pose-image">
             <div class="pose-instruction">Pose 1: Tilt your body to the left</div>
+            <img src="tilt/pose3.jpeg" alt="Pose 2" class="pose-image">
             <div class="pose-instruction">Pose 2: Tilt your body to the right</div>
             <div class="pose-instruction">Enjoy the music!</div>
         </div>
