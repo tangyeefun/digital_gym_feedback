@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediaPipe Hand Tracking</title>
+  <style>
+    #video {
+      width: 640px;
+      height: 480px;
+      border: 1px solid black;
+      display: none; /* Hide the video element */
+    }
+    #canvas {
+      width: 640px;
+      height: 480px;
+      border: 1px solid black;
+    }
+    #output {
+      margin-top: 10px;
+      font-size: 24px;
+      color: green;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Raise your hands as many times as you can!</h1>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <div id="output">0</div>
+  <div id="controls">
+    <button id="startButton">Start</button>
+    <button id="resetButton">Reset</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script>
+    // Get the video, canvas, and control elements
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const outputElement = document.getElementById('output');
+    const startButton = document.getElementById('startButton');
+    const resetButton = document.getElementById('resetButton');
+
+    let counter = 0;
+    let counting = false;
+    let handRaised = false;
+    let handLowered = true;
+
+    // Load the MediaPipe hand tracking model
+    const hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults((results) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      if (results.multiHandLandmarks) {
+        for (const landmarks of results.multiHandLandmarks) {
+          drawConnectors(ctx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
+          drawLandmarks(ctx, landmarks, {color: '#FF0000', lineWidth: 2});
+        }
+
+        if (results.multiHandLandmarks.length === 2) {
+          let allHandsRaised = true;
+          for (const landmarks of results.multiHandLandmarks) {
+            const wrist = landmarks[0];
+            const middleFingerTip = landmarks[12];
+
+            if (middleFingerTip.y >= wrist.y) {
+              allHandsRaised = false;
+            }
+          }
+
+          if (allHandsRaised && counting && handLowered) {
+            counter++;
+            outputElement.innerText = counter;
+            handRaised = true;
+            handLowered = false;
+          } else if (!allHandsRaised) {
+            handLowered = true;
+          }
+        }
+      }
+    });
+
+    // Set up the video and hand tracking
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.play();
+      })
+      .catch((error) => {
+        console.error('Error accessing the camera: ', error);
+      });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await hands.send({image: video});
+      },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+
+    // Start button event listener
+    startButton.addEventListener('click', () => {
+      counting = true;
+    });
+
+    // Reset button event listener
+    resetButton.addEventListener('click', () => {
+      counting = false;
+      counter = 0;
+      outputElement.innerText = counter;
+    });
+  </script>
+</body>
+</html>
