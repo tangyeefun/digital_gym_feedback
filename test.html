@@ -147,18 +147,18 @@
                 labelContainer.childNodes[i].innerHTML = classPrediction;
             }
 
-            // Check if Pose 2 or Pose 3 has attained 0.80 to 1.00 points
+            // Check if Pose 2 or Pose 3 has attained 0.90 to 1.00 points
             const pose2 = prediction.find(p => p.className === "Pose 2");
             const pose3 = prediction.find(p => p.className === "Pose 3");
 
-            if (pose2 && pose2.probability >= 0.80 && pose2.probability <= 1.00) {
+            if (pose2 && pose2.probability >= 0.90 && pose2.probability <= 1.00) {
                 pose2Audio.play();
             } else {
                 pose2Audio.pause();
                 pose2Audio.currentTime = 0;
             }
 
-            if (pose3 && pose3.probability >= 0.80 && pose3.probability <= 1.00) {
+            if (pose3 && pose3.probability >= 0.90 && pose3.probability <= 1.00) {
                 pose3Audio.play();
             } else {
                 pose3Audio.pause();
