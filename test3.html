@@ -24,7 +24,7 @@
     #controls {
       margin-top: 10px;
     }
-    #startButton, #resetButton {
+    #startButton, #resetButton, #homeButton {
       font-size: 32px; /* Increase the font size by 4 times */
       padding: 20px; /* Increase the padding for better appearance */
     }
@@ -38,6 +38,7 @@
   <div id="controls">
     <button id="startButton">Start</button>
     <button id="resetButton">Reset</button>
+    <button id="homeButton">Home</button>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -51,6 +52,7 @@
     const outputElement = document.getElementById('output');
     const startButton = document.getElementById('startButton');
     const resetButton = document.getElementById('resetButton');
+    const homeButton = document.getElementById('homeButton');
 
     let counter = 0;
     let counting = false;
@@ -134,6 +136,11 @@
       counting = false;
       counter = 0;
       outputElement.innerText = counter;
+    });
+
+    // Home button event listener
+    homeButton.addEventListener('click', () => {
+      window.location.href = 'index.html';
     });
   </script>
 </body>
