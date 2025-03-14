@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balance on one foot</title>
+  <style>
+    #video {
+      width: 640px;
+      height: 480px;
+      border: 1px solid black;
+      display: none; /* Hide the video element */
+    }
+    #canvas {
+      width: 640px;
+      height: 480px;
+      border: 1px solid black;
+    }
+    #output {
+      margin-top: 10px;
+      font-size: 48px; /* Increase the font size by 2 times */
+      color: green;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    #resetButton, #homeButton {
+      font-size: 32px; /* Increase the font size by 4 times */
+      padding: 20px; /* Increase the padding for better appearance */
+    }
+  </style>
+</head>
+<body>
+  <h1>Single leg balance</h1>
+  <h2>To start, make sure camera can see full body.</h2>
+  <video id="video" width="640" height="480" autoplay></video>
+  <canvas id="canvas" width="640" height="480"></canvas>
+  <div id="output">0</div>
+  <div id="controls">
+    <button id="resetButton">Reset</button>
+    <button id="homeButton">Home</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script>
+    // Get the video, canvas, and control elements
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const outputElement = document.getElementById('output');
+    const resetButton = document.getElementById('resetButton');
+    const homeButton = document.getElementById('homeButton');
+
+    let footRaised = false;
+    let footLowered = true;
+    let initialFootLevel = null;
+    let raiseStartTime = null;
+
+    // Load the MediaPipe Pose model
+    const pose = new Pose({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+      }
+    });
+
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      enableSegmentation: true,
+      smoothSegmentation: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    pose.onResults((results) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      if (results.poseLandmarks) {
+        drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
+        drawLandmarks(ctx, results.poseLandmarks, {color: '#FF0000', lineWidth: 2});
+
+        const leftFoot = results.poseLandmarks[31];
+        const rightFoot = results.poseLandmarks[32];
+        const leftHand = results.poseLandmarks[15];
+        const rightHand = results.poseLandmarks[16];
+        const leftElbow = results.poseLandmarks[13];
+        const rightElbow = results.poseLandmarks[14];
+        const leftShoulder = results.poseLandmarks[11];
+        const rightShoulder = results.poseLandmarks[12];
+
+        // Check if both feet are detected
+        if (results.poseLandmarks[31] && results.poseLandmarks[32]) {
+          outputElement.innerText = "Please raise both arms to shoulder level.";
+        }
+
+        // Check if both hands and elbows are at shoulder level
+        const handsAtShoulderLevel = leftHand.y < leftShoulder.y && rightHand.y < rightShoulder.y;
+        const elbowsAtShoulderLevel = leftElbow.y < leftShoulder.y && rightElbow.y < rightShoulder.y;
+
+        if (handsAtShoulderLevel && elbowsAtShoulderLevel) {
+          initialFootLevel = Math.min(leftFoot.y, rightFoot.y);
+          outputElement.innerText = "Please balance on one foot";
+        }
+
+        const footAboveLevel = Math.min(leftFoot.y, rightFoot.y) < initialFootLevel;
+
+        if (footAboveLevel && footLowered) {
+          footRaised = true;
+          footLowered = false;
+          raiseStartTime = new Date().getTime();
+        } else if (!footAboveLevel) {
+          footLowered = true;
+          raiseStartTime = null;
+        }
+
+        if (footRaised && raiseStartTime) {
+          const currentTime = new Date().getTime();
+          const elapsedTime = (currentTime - raiseStartTime) / 1000; // Convert to seconds
+          if (elapsedTime > 3) {
+            outputElement.innerText = "Good Job!";
+            setTimeout(() => {
+              outputElement.innerText = "";
+            }, 5000); // Show "Good Job!" for 5 seconds
+          }
+        }
+      }
+    });
+
+    // Set up the video and pose tracking
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+        video.play();
+      })
+      .catch((error) => {
+        console.error('Error accessing the camera: ', error);
+      });
+
+    const camera = new Camera(video, {
+      onFrame: async () => {
+        await pose.send({image: video});
+      },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+
+    // Reset button event listener
+    resetButton.addEventListener('click', () => {
+      outputElement.innerText = "";
+      initialFootLevel = null;
+      raiseStartTime = null;
+    });
+
+    // Home button event listener
+    homeButton.addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
