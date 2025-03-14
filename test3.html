@@ -18,16 +18,20 @@
     }
     #output {
       margin-top: 10px;
-      font-size: 24px;
+      font-size: 48px; /* Increase the font size by 2 times */
       color: green;
     }
     #controls {
       margin-top: 10px;
     }
+    #startButton, #resetButton {
+      font-size: 32px; /* Increase the font size by 4 times */
+      padding: 20px; /* Increase the padding for better appearance */
+    }
   </style>
 </head>
 <body>
-  <h1>Raise your hands as many times as you can!</h1>
+  <h1>Raise your hands (above eye level) as many times as you can!</h1>
   <video id="video" width="640" height="480" autoplay></video>
   <canvas id="canvas" width="640" height="480"></canvas>
   <div id="output">0</div>
@@ -82,8 +86,9 @@
           for (const landmarks of results.multiHandLandmarks) {
             const wrist = landmarks[0];
             const middleFingerTip = landmarks[12];
+            const eyeLevel = 0.4; // Adjust this value based on your camera setup and eye level
 
-            if (middleFingerTip.y >= wrist.y) {
+            if (middleFingerTip.y >= eyeLevel) {
               allHandsRaised = false;
             }
           }
