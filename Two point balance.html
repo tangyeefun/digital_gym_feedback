@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Two Point Balance Trainer</title>
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg:#0b0c0f;
+      --card:#111319;
+      --border:#1d2230;
+      --muted:#a7afc0;
+      --text:#e7e9ee;
+      --primary:#3d7cff;
+      --ok:#2cbb5d;
+      --neutral:#444;
+      --warn:#ff6b6b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 24px 20px 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid #333;
+    }
+
+    #video, #canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #video { display: none; }
+
+    .panel {
+      padding: 14px;
+      border: 1px dashed #333;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+
+    .panel h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: .04em;
+    }
+
+    #instructionText {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    #feedbackText {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--warn);
+      text-align: center;
+      min-height: 1.2em;
+      line-height: 1.2;
+    }
+
+    #feedbackText small {
+      display: block;
+      font-size: 20px;
+      color: var(--ok);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    button {
+      padding: 10px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    #startButton {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    #resetButton {
+      background: var(--neutral);
+      color: #fff;
+    }
+
+    #homeButton {
+      background: var(--ok);
+      color: #fff;
+    }
+
+    #strengthButton {
+      background: #9254ff;
+      color: #fff;
+    }
+
+    .button-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    #canvas {
+      transition: box-shadow .35s ease, border-color .35s ease;
+      border: 1px solid #333;
+    }
+
+    #canvas.success-glow {
+      box-shadow: 0 0 40px 10px rgba(44,187,93,0.8);
+      border-color: #2cbb5d;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Two Point Balance Trainer</h1>
+      <p>Hold each pose for 3 seconds. Stay still for best results.</p>
+    </header>
+
+    <main class="layout">
+      <!-- Left: video + canvas + buttons -->
+      <section class="card">
+        <div class="stage">
+          <video id="video" autoplay playsinline></video>
+          <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="button-bar">
+          <button id="startButton">Start Exercise</button>
+          <button id="resetButton">Reset</button>
+          <a href="index.html" aria-label="Back to home">
+            <button id="homeButton">🏠 Home</button>
+          </a>
+          <a href="Strength Training.html" aria-label="Go to Strength Training">
+            <button id="strengthButton">Strength Training</button>
+          </a>
+        </div>
+      </section>
+
+      <!-- Right: instruction + feedback panels -->
+      <aside class="card">
+        <div class="panel">
+          <h3>Instruction</h3>
+          <p id="instructionText">Press <strong>Start</strong> to begin.</p>
+        </div>
+        <div class="panel">
+          <h3>Feedback</h3>
+          <p id="feedbackText"></p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MediaPipe libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const startButton = document.getElementById("startButton");
+    const resetButton = document.getElementById("resetButton");
+    const feedbackText = document.getElementById("feedbackText");
+    const instructionText = document.getElementById("instructionText");
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    let stage = "idle",
+        currentPose = 1,
+        startTime = null,
+        camera = null;
+
+    function setFeedback(msg){ feedbackText.innerHTML = msg; }
+    function setInstruction(msg){ instructionText.innerText = msg; }
+
+    function getAngle(a, b, c) {
+      const abx = a.x - b.x, aby = a.y - b.y;
+      const cbx = c.x - b.x, cby = c.y - b.y;
+      const dot = abx * cbx + aby * cby;
+      const magAB = Math.sqrt(abx*abx + aby*aby);
+      const magCB = Math.sqrt(cbx*cbx + cby*cby);
+      if (magAB === 0 || magCB === 0) return 180;
+      let cos = dot / (magAB * magCB);
+      cos = Math.max(-1, Math.min(1, cos));
+      return Math.acos(cos) * 180 / Math.PI;
+    }
+
+    function detectTwoPointSupport(lm){
+      const LW = lm[15], RW = lm[16], LF = lm[31], RF = lm[32];
+      const LK = lm[25], RK = lm[26], LH = lm[23], RH = lm[24];
+      if(!(LW && RW && LF && RF && LK && RK && LH && RH)) return {ok:false};
+
+      // ensure lower body visible
+      const visible = (p)=> p && (p.visibility === undefined || p.visibility > 0.5);
+      if(![LF,RF,LK,RK,LH,RH].every(visible)) return {ok:false};
+
+      // reject sitting posture
+      const leftKnee = getAngle(LH, LK, LF);
+      const rightKnee = getAngle(RH, RK, RF);
+      if(leftKnee < 130 && rightKnee < 130) return {ok:false};
+
+      // reject half body visibility
+      const idx = [11,12,23,24,31,32].filter(i=>lm[i]);
+      const ys = idx.map(i=>lm[i].y);
+      const span = Math.max(...ys) - Math.min(...ys);
+      if(span < 0.5) return {ok:false};
+
+      // require exactly 2 low points among wrists/feet
+      const points = [
+        {p:LW}, {p:RW}, {p:LF}, {p:RF}
+      ].sort((a,b)=> b.p.y - a.p.y); // larger y = lower
+
+      const CLOSE = 0.06, GAP = 0.10;
+      const lowest = points[0], second = points[1], third = points[2], fourth = points[3];
+      const twoLow = Math.abs(lowest.p.y - second.p.y) <= CLOSE;
+      const othersHigh = (lowest.p.y - third.p.y) >= GAP && (lowest.p.y - fourth.p.y) >= GAP;
+      if(!(twoLow && othersHigh)) return {ok:false};
+
+      return {ok:true};
+    }
+
+    function detectStillness(lm){
+      if(!detectStillness.prev){
+        detectStillness.prev = lm.map(l=>({x:l.x,y:l.y}));
+        return true;
+      }
+      let move = 0;
+      for(let i=0;i<lm.length;i++){
+        const dx = lm[i].x - detectStillness.prev[i].x;
+        const dy = lm[i].y - detectStillness.prev[i].y;
+        move += Math.sqrt(dx*dx + dy*dy);
+      }
+      detectStillness.prev = lm.map(l=>({x:l.x,y:l.y}));
+      return move < 0.18;
+    }
+
+    const pose = new Pose({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    pose.onResults(results => {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(results.image) ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+      if(!results.poseLandmarks) return;
+
+      const lm = results.poseLandmarks;
+
+      drawConnectors(ctx, lm, POSE_CONNECTIONS, { lineWidth: 2 });
+      drawLandmarks(ctx, lm, { radius: 2 });
+
+      const det = detectTwoPointSupport(lm);
+      if(!det.ok){
+        startTime = null;
+        setFeedback('');
+        return;
+      }
+
+      const still = detectStillness(lm);
+      if(!still){
+        setFeedback('Please try to stay still.<br><small>Look at an object in front of you.</small>');
+        return;
+      }
+
+      if(!startTime) startTime = Date.now();
+      const held = (Date.now() - startTime) / 1000;
+
+      if(held >= 3){
+        if(currentPose === 1){
+          setFeedback("Great body shape with good body control. Let’s perform another.");
+          canvas.classList.add('success-glow');
+          setTimeout(()=>{
+            setFeedback("");
+            canvas.classList.remove('success-glow');
+            currentPose = 2;
+            startTime = null;
+            setInstruction("Pose 2: Balance on TWO POINTS for 3s – make it DIFFERENT from Pose 1.");
+          }, 3000);
+        } else if(currentPose === 2){
+          setFeedback("Nice variation. Let’s perform another.");
+          canvas.classList.add('success-glow');
+          setTimeout(()=>{
+            setFeedback("");
+            canvas.classList.remove('success-glow');
+            currentPose = 3;
+            startTime = null;
+            setInstruction("Pose 3: Balance on TWO POINTS for 3s – different from Pose 1 & 2.");
+          }, 3000);
+        } else {
+          setFeedback("Perfect! You did well with body control and variation.");
+          canvas.classList.add('success-glow');
+          setTimeout(()=>{
+            setFeedback("");
+            canvas.classList.remove('success-glow');
+            setInstruction("All two-point balances complete!");
+            stage = 'done';
+          }, 3000);
+        }
+      }
+    });
+
+    async function startTracking(){
+      startButton.disabled = true;
+      startButton.textContent = 'Starting…';
+      resizeCanvas();
+
+      camera = new Camera(video, {
+        onFrame: async () => { await pose.send({ image: video }); },
+        width: 960,
+        height: 720
+      });
+      await camera.start();
+
+      stage = 'run';
+      currentPose = 1;
+      startTime = null;
+      setInstruction("Pose 1: Balance on TWO POINTS for 3s.");
+      startButton.textContent = 'Running';
+      setTimeout(()=>{ startButton.disabled = false; }, 600);
+    }
+
+    function stopCamera(){
+      if(video.srcObject){
+        video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      if(camera && camera.stop){
+        try { camera.stop(); } catch(e) {}
+        camera = null;
+      }
+    }
+
+    startButton.addEventListener("click", startTracking);
+
+    resetButton.addEventListener("click", ()=>{
+      setInstruction('Press Start to begin.');
+      setFeedback('');
+      stage = 'idle';
+      currentPose = 1;
+      startTime = null;
+      stopCamera();
+      canvas.classList.remove('success-glow');
+      detectStillness.prev = null;
+    });
+  </script>
+</body>
+</html>

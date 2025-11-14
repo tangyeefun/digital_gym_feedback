@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Strength Training</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0c0f; --card:#111319; --border:#1d2230; --muted:#a7afc0; --text:#e7e9ee;
+      --primary:#3d7cff; --ok:#2cbb5d; --neutral:#444; --warn:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .wrap{ max-width:1000px; margin:0 auto; padding:32px 20px; }
+    header h1{ margin:0; font-size:28px; }
+    header p{ margin:6px 0 0; font-size:14px; color:var(--muted); }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:20px;
+      margin-top:20px;
+    }
+
+    h2{
+      margin-top:0;
+      font-size:20px;
+    }
+
+    ol{
+      padding-left:20px;
+      margin:0;
+    }
+    li{
+      margin-bottom:28px;
+      line-height:1.4;
+    }
+    .exercise-title{
+      font-weight:600;
+      font-size:16px;
+    }
+    .exercise-detail{
+      display:block;
+      font-size:14px;
+      color:var(--muted);
+      margin-top:2px;
+    }
+
+    /* uniform image sizing */
+    .exercise-img{
+      display:block;
+      margin:10px auto 0;
+      border-radius:10px;
+      border:1px solid var(--border);
+      width:auto;
+      height:220px; /* fixed consistent height for all */
+      max-width:100%;
+      object-fit:cover;
+    }
+
+    .buttons{
+      margin-top:16px;
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    button{
+      padding:10px 18px;
+      font-size:16px;
+      border:none;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    #homeButton{ background:var(--ok); color:#fff; }
+
+    .note{
+      margin-top:18px;
+      padding-top:12px;
+      border-top:1px dashed var(--border);
+      font-size:14px;
+      color:var(--muted);
+    }
+    .note strong{
+      color:var(--ok);
+      font-weight:600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Strength Training</h1>
+      <p>
+        Use these exercises to build strength and improve your balance for all the balance activities 
+        (one point, two points, three points and four points).
+      </p>
+    </header>
+
+    <section class="card">
+      <h2>Exercises</h2>
+      <ol>
+        <li>
+          <span class="exercise-title">Skip a rope (10 counts)</span>
+          <span class="exercise-detail">
+            Hold the rope handles, swing the rope over your head and jump as it passes your feet. Count 10 skips.
+          </span>
+          <img src="Images/strength skipping.gif" alt="Skipping rope exercise" class="exercise-img">
+        </li>
+
+        <li>
+          <span class="exercise-title">Alternate superman pose (5 counts each side)</span>
+          <span class="exercise-detail">
+            Lie on your tummy. Lift your right arm and left leg together, hold briefly, then switch to left arm and right leg. 
+            Count 5 lifts each side.
+          </span>
+          <img src="Images/strength superman.gif" alt="Alternate superman pose" class="exercise-img">
+        </li>
+
+        <li>
+          <span class="exercise-title">Alternate single leg balance (10 counts each side)</span>
+          <span class="exercise-detail">
+            Stand tall and lift one leg off the floor. Try to balance while counting slowly to 10, then switch legs.
+          </span>
+          <img src="Images/strength single leg.png" alt="Alternate single leg balance" class="exercise-img">
+        </li>
+
+        <li>
+          <span class="exercise-title">Planking on floor (10 counts)</span>
+          <span class="exercise-detail">
+            Place your forearms on the floor, legs straight, body in a straight line. Hold the plank while counting to 10.
+          </span>
+          <img src="Images/strength plank.jpeg" alt="Plank on floor" class="exercise-img">
+        </li>
+
+        <li>
+          <span class="exercise-title">Plank with apparatus (10 counts)</span>
+          <span class="exercise-detail">
+            Place your hands or forearms on a stable apparatus (e.g. step or low box) and hold a plank position while counting to 10.
+          </span>
+          <img src="Images/strength plank bench.jpg" alt="Plank with apparatus" class="exercise-img">
+        </li>
+      </ol>
+
+      <div class="buttons">
+        <a href="Index.html" aria-label="Back to home">
+          <button id="homeButton">🏠 Home</button>
+        </a>
+      </div>
+
+      <div class="note">
+        After you complete these exercises, <strong>go back to the balance pages and try the balances again</strong>.
+        You can use the <strong>Home</strong> button to choose any balance task (one point, two points, three points or four points).
+      </div>
+    </section>
+  </div>
+</body>
+</html>

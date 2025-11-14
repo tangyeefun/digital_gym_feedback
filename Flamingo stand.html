@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flamingo Pose Trainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      background:#0b0c0f; color:#e7e9ee;
+    }
+    .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 20px; }
+    header h1 { margin:0; font-size:28px; }
+    header p { margin:0; font-size:14px; color:#a7afc0; }
+    .layout { display:grid; grid-template-columns: 1.2fr .8fr; gap:24px; }
+    @media (max-width: 980px){ .layout{ grid-template-columns: 1fr; } }
+    .card { background:#111319; border:1px solid #1d2230; border-radius:12px; padding:16px; }
+    .stage { position:relative; width:100%; aspect-ratio:4/3; background:#000; border:1px solid #333; border-radius:12px; overflow:hidden; }
+    #video,#canvas{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    #video{ display:none; }
+    .panel{ padding:14px; border:1px dashed #333; border-radius:12px; margin-bottom:12px; }
+    .panel h3{ margin:0 0 6px; font-size:14px; text-transform:uppercase; color:#a7afc0; }
+    #instructionText{ font-size:26px; font-weight:700; }
+    #feedbackText{ font-size:32px; font-weight:800; color:#ff6b6b; text-align:center; }
+    button{ padding:10px 18px; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
+    #startButton{ background:#3d7cff; color:#fff; }
+    #resetButton{ background:#444; color:#fff; }
+    #homeButton{ background:#2cbb5d; color:#fff; } /* green home button */
+    img.example {
+      margin-top:10px;
+      width:50%;
+      border-radius:8px;
+      display:block;
+      margin-left:auto;
+      margin-right:auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Flamingo Pose Trainer</h1>
+      <p>Hold each pose for 3 seconds. Stay still for best results.</p>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <div class="stage">
+          <video id="video" autoplay playsinline></video>
+          <canvas id="canvas"></canvas>
+        </div>
+        <div style="margin-top:12px;">
+          <button id="startButton">Start Exercise</button>
+          <button id="resetButton">Reset</button>
+          <a href="Index.html"><button id="homeButton">🏠 Home</button></a>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="panel">
+          <h3>Instruction</h3>
+          <p id="instructionText">Press <strong>Start</strong> to begin.</p>
+          <img id="poseImage" class="example" src="Images/Flamingo1.png" alt="Flamingo Pose Example" />
+        </div>
+        <div class="panel">
+          <h3>Feedback</h3>
+          <p id="feedbackText"></p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const video=document.getElementById('video');
+    const canvas=document.getElementById('canvas');
+    const ctx=canvas.getContext('2d');
+    const startButton=document.getElementById('startButton');
+    const resetButton=document.getElementById('resetButton');
+    const instructionElement=document.getElementById('instructionText');
+    const feedbackElement=document.getElementById('feedbackText');
+    const poseImage=document.getElementById('poseImage');
+
+    function setInstruction(msg){ instructionElement.innerText=msg; }
+    function setFeedback(msg){ feedbackElement.innerText=msg; }
+
+    function resizeCanvas(){
+      const rect=canvas.parentElement.getBoundingClientRect();
+      const dpr=window.devicePixelRatio||1;
+      canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+      canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    window.addEventListener('resize',resizeCanvas); resizeCanvas();
+
+    let stage="idle";
+    let startTime=null;
+    let camera=null;
+
+    const pose=new Pose({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+    pose.setOptions({modelComplexity:1,smoothLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+
+    function timeHeld(sec){
+      if(!startTime) startTime=Date.now();
+      return (Date.now()-startTime)/1000>=sec;
+    }
+    function resetTimer(){ startTime=null; }
+
+    function detectFlamingoPose(landmarks){
+      const leftFoot=landmarks[31], rightFoot=landmarks[32];
+      const leftKnee=landmarks[25], rightKnee=landmarks[26];
+      if(!leftFoot||!rightFoot||!leftKnee||!rightKnee) return false;
+      const legLifted = (leftFoot.y < rightFoot.y - 0.15) || (rightFoot.y < leftFoot.y - 0.15);
+      return legLifted;
+    }
+
+    function detectStillness(landmarks){
+      if(!detectStillness.prev){ detectStillness.prev=landmarks.map(l=>({x:l.x,y:l.y})); return true; }
+      let move=0;
+      for(let i=0;i<landmarks.length;i++){
+        const dx=landmarks[i].x-detectStillness.prev[i].x;
+        const dy=landmarks[i].y-detectStillness.prev[i].y;
+        move+=Math.sqrt(dx*dx+dy*dy);
+      }
+      detectStillness.prev=landmarks.map(l=>({x:l.x,y:l.y}));
+      return move<0.1;
+    }
+
+    let currentPose=1;
+    const poses=[
+      {text:"Stand tall on one leg, other knee bent forward", image:"Images/Flamingo1.png"},
+      {text:"Stand tall on one leg, other straightened forward", image:"Images/Flamingo2.png"}
+    ];
+
+    let feedbackTimeout=null;
+    pose.onResults((res)=>{
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(res.image) ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+      if(res.poseLandmarks){
+        drawConnectors(ctx,res.poseLandmarks,POSE_CONNECTIONS,{color:'#3dd9b3',lineWidth:2});
+        drawLandmarks(ctx,res.poseLandmarks,{color:'#ff4d4d',radius:2});
+        const lm=res.poseLandmarks;
+
+        if(!detectStillness(lm)){
+          setFeedback("Please try to stay still.");
+          if(feedbackTimeout) clearTimeout(feedbackTimeout);
+          feedbackTimeout=setTimeout(()=>{setFeedback("");feedbackTimeout=null;},1000);
+          resetTimer();
+          return;
+        }
+
+        if(stage==="flamingo"){
+          setInstruction(poses[currentPose-1].text);
+          if(detectFlamingoPose(lm)){
+            if(timeHeld(3)){
+              if(currentPose===1){
+                currentPose=2;
+                resetTimer();
+                setInstruction(poses[1].text);
+                poseImage.src=poses[1].image;
+              } else {
+                setInstruction("Good job! Both poses complete!");
+                stage="done";
+              }
+            }
+          } else resetTimer();
+        }
+      }
+    });
+
+    async function startTracking(){
+      startButton.disabled=true; startButton.textContent="Starting…";
+      resizeCanvas();
+      camera=new Camera(video,{onFrame:async()=>{await pose.send({image:video});},width:960,height:720});
+      camera.start();
+      stage="flamingo";
+      currentPose=1;
+      setInstruction(poses[0].text);
+      poseImage.src=poses[0].image;
+      startButton.textContent="Running";
+      setTimeout(()=>{startButton.disabled=false;},600);
+    }
+
+    function stopCamera(){
+      if(video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); video.srcObject=null; }
+      if(camera&&camera.stop){ try{camera.stop();}catch{} camera=null; }
+    }
+
+    startButton.addEventListener('click',startTracking);
+    resetButton.addEventListener('click',()=>{ 
+      setInstruction("Press Start to begin."); 
+      stage="idle"; resetTimer(); stopCamera(); 
+      poseImage.src="Images/Flamingo1.png";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Three Point Balance Trainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0c0f; --card:#111319; --border:#1d2230; --muted:#a7afc0; --text:#e7e9ee;
+      --primary:#3d7cff; --ok:#2cbb5d; --neutral:#444; --warn:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
+    .wrap{ max-width:1000px; margin:0 auto; padding:32px 20px; }
+    header h1{ margin:0; font-size:28px; }
+    header p{ margin:6px 0 0; font-size:14px; color:var(--muted); }
+
+    .layout{ display:grid; grid-template-columns:1.2fr .8fr; gap:24px; }
+    @media (max-width:980px){ .layout{ grid-template-columns:1fr; } }
+
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+    .stage{ position:relative; width:100%; aspect-ratio:4/3; background:#000; border:1px solid #333; border-radius:12px; overflow:hidden; }
+    #video,#canvas{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    #video{ display:none; }
+
+    .panel{ padding:14px; border:1px dashed #333; border-radius:12px; margin-bottom:12px; }
+    .panel h3{ margin:0 0 6px; font-size:14px; text-transform:uppercase; color:var(--muted); letter-spacing:.04em; }
+    #instructionText{ font-size:26px; font-weight:700; line-height:1.35; }
+    #feedbackText{
+      font-size:32px;
+      font-weight:800;
+      color:var(--warn);
+      text-align:center;
+      min-height:1.2em;
+      line-height:1.2;
+    }
+    #feedbackText small{
+      display:block;
+      font-size:20px;
+      color:var(--ok);
+      font-weight:600;
+      margin-top:4px;
+    }
+
+    button{ padding:10px 18px; font-size:16px; border:none; border-radius:8px; cursor:pointer; }
+    #startButton{ background:var(--primary); color:#fff; }
+    #resetButton{ background:var(--neutral); color:#fff; }
+    #homeButton{ background:var(--ok); color:#fff; }
+    #strengthButton{ background:#9254ff; color:#fff; }
+
+    #canvas{
+      transition: box-shadow .35s ease, border-color .35s ease;
+      border:1px solid #333;
+    }
+    #canvas.success-glow{
+      box-shadow: 0 0 40px 10px rgba(44,187,93,.8);
+      border-color:#2cbb5d;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Three Point Balance Trainer</h1>
+      <p>Hold each pose for 3 seconds. Keep still. Poses 1–3 must use different supporting limbs.</p>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <div class="stage">
+          <video id="video" autoplay playsinline></video>
+          <canvas id="canvas"></canvas>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="startButton">Start Exercise</button>
+          <button id="resetButton">Reset</button>
+          <a href="Index.html" aria-label="Back to home"><button id="homeButton">🏠 Home</button></a>
+          <a href="Strength Training.html" aria-label="Go to Strength Training"><button id="strengthButton">Strength Training</button></a>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="panel">
+          <h3>Instruction</h3>
+          <p id="instructionText">Press <strong>Start</strong> to begin.</p>
+        </div>
+        <div class="panel">
+          <h3>Feedback</h3>
+          <p id="feedbackText"></p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- MediaPipe -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const startButton = document.getElementById('startButton');
+    const resetButton = document.getElementById('resetButton');
+    const instructionElement = document.getElementById('instructionText');
+    const feedbackElement = document.getElementById('feedbackText');
+
+    function setInstruction(msg){ instructionElement.innerText = msg; }
+    function setFeedback(msg){ feedbackElement.innerHTML = msg; }
+
+    // Simple canvas sizing
+    function resizeCanvas(){
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width  = rect.width;
+      canvas.height = rect.height;
+    }
+    window.addEventListener('resize', resizeCanvas); 
+    resizeCanvas();
+
+    let stage = 'idle';
+    let startTime = null;
+    let camera = null;
+
+    // New: track inability to complete Pose 1
+    let inabilityStart = null;
+    let strengthMsgShown = false;
+
+    const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ modelComplexity:1, smoothLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+
+    function timeHeld(sec){
+      if(!startTime) startTime = Date.now();
+      return (Date.now() - startTime)/1000 >= sec;
+    }
+    function resetTimer(){ startTime = null; }
+
+    // Stillness (only used AFTER pose is correct)
+    let feedbackTimeout = null;
+    function detectStillness(landmarks){
+      if(!detectStillness.prev){ 
+        detectStillness.prev = landmarks.map(l=>({x:l.x,y:l.y})); 
+        return true; 
+      }
+      let move = 0;
+      for(let i=0;i<landmarks.length;i++){
+        const dx = landmarks[i].x - detectStillness.prev[i].x;
+        const dy = landmarks[i].y - detectStillness.prev[i].y;
+        move += Math.sqrt(dx*dx + dy*dy);
+      }
+      detectStillness.prev = landmarks.map(l=>({x:l.x,y:l.y}));
+      return move < 0.18;
+    }
+
+    // Detect EXACTLY three supporting limbs among LW,RW,LF,RF by vertical position.
+    function detectThreePointSupport(lm){
+      const LW = lm[15], RW = lm[16], LF = lm[31], RF = lm[32];
+      if(!(LW&&RW&&LF&&RF)) return {ok:false};
+
+      const pts = [
+        {id:'LW', p:LW}, {id:'RW', p:RW}, {id:'LF', p:LF}, {id:'RF', p:RF}
+      ].sort((a,b)=> b.p.y - a.p.y); // lowest (largest y) first
+
+      const first = pts[0], second = pts[1], third = pts[2], fourth = pts[3];
+      const CLOSE3 = 0.08;
+      const GAP3   = 0.10;
+
+      const spreadOK = (first.p.y - third.p.y) <= CLOSE3;
+      const separatedFromFourth = (third.p.y - fourth.p.y) >= GAP3;
+      if(!(spreadOK && separatedFromFourth)) return {ok:false};
+
+      const supports = [first.id, second.id, third.id].sort(); // e.g., ["LF","LW","RW"]
+      return {ok:true, supports};
+    }
+
+    // Track used support sets to enforce variety across the 3 poses
+    let usedSupportSets = []; // arrays of 3 IDs, sorted
+    function isNewSupportSet(supports){
+      const key = supports.join(',');
+      return !usedSupportSets.some(prev => prev.join(',') === key);
+    }
+
+    let currentPose = 1;
+    const poses = [
+      { text: "Pose 1: Balance on EXACTLY THREE POINTS for 3s (any three of hands/feet). Keep still." },
+      { text: "Pose 2: Three-point balance for 3s using a DIFFERENT set of limbs than Pose 1." },
+      { text: "Pose 3: Three-point balance for 3s using a DIFFERENT set of limbs than Poses 1 & 2." }
+    ];
+
+    // New: check if user has failed to complete Pose 1 within 60 seconds
+    function checkInabilityTimer(){
+      if(strengthMsgShown) return;
+      if(stage === 'idle' || stage === 'done') return;
+      if(currentPose !== 1) return;
+      if(!inabilityStart) return;
+
+      const elapsed = (Date.now() - inabilityStart) / 1000;
+      if(elapsed >= 60){
+        setFeedback('Try doing some strength training. Click on the "Strength Training" button on the left to learn how!');
+        strengthMsgShown = true;
+      }
+    }
+
+    pose.onResults((res)=>{
+      // Pause detection when celebrating or done, but keep rendering latest frame
+      if(stage === 'pause' || stage === 'done'){
+        if(res.image){
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+        }
+        return;
+      }
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(res.image) ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+      if(!res.poseLandmarks){
+        checkInabilityTimer();
+        return;
+      }
+
+      // Draw slim pose
+      drawConnectors(ctx, res.poseLandmarks, POSE_CONNECTIONS, { lineWidth: 2 });
+      drawLandmarks(ctx, res.poseLandmarks, { radius: 2 });
+
+      const lm = res.poseLandmarks;
+
+      if(stage === 'run'){
+        setInstruction(poses[currentPose-1].text);
+
+        // 1) CHECK POSE FIRST
+        const det = detectThreePointSupport(lm);
+        if(!det.ok){
+          resetTimer();
+          checkInabilityTimer();
+          return;  // No stillness check when pose is not yet correct
+        }
+
+        // 2) Enforce different combination per pose
+        if(!isNewSupportSet(det.supports)){
+          setFeedback("Try a different combination of supporting limbs.");
+          if(feedbackTimeout) { clearTimeout(feedbackTimeout); }
+          feedbackTimeout = setTimeout(()=>{ 
+            setFeedback(''); 
+            feedbackTimeout = null; 
+          }, 1200);
+          resetTimer();
+          checkInabilityTimer();
+          return;
+        }
+
+        // 3) Now pose is correct & novel → check STILLNESS
+        if(!detectStillness(lm)){
+          setFeedback('Please try to stay still like a statue.<br><small>Look at an object in front of you.</small>');
+          if(feedbackTimeout) clearTimeout(feedbackTimeout);
+          feedbackTimeout = setTimeout(()=>{ 
+            setFeedback(""); 
+            feedbackTimeout = null; 
+          }, 1000);
+          resetTimer();
+          checkInabilityTimer();
+          return;
+        }
+
+        // 4) Pose OK + stillness OK → hold timer
+        if(timeHeld(3)){
+          usedSupportSets.push(det.supports);
+
+          if(currentPose === 1){
+            setFeedback("Great body shape with good body control. Let’s perform another.");
+            canvas.classList.add('success-glow');
+            stage = 'pause';
+            setTimeout(() => {
+              setFeedback("");
+              canvas.classList.remove('success-glow');
+              currentPose = 2;
+              resetTimer();
+              setInstruction(poses[1].text);
+              stage = 'run';
+            }, 5000);
+
+          } else if (currentPose === 2){
+            setFeedback("Nice variation. Let’s perform another.");
+            canvas.classList.add('success-glow');
+            stage = 'pause';
+            setTimeout(() => {
+              setFeedback("");
+              canvas.classList.remove('success-glow');
+              currentPose = 3;
+              resetTimer();
+              setInstruction(poses[2].text);
+              stage = 'run';
+            }, 5000);
+
+          } else {
+            setFeedback("Perfect! You did well with body control and variation.");
+            canvas.classList.add('success-glow');
+            stage = 'pause';
+            setTimeout(() => {
+              setFeedback("");
+              canvas.classList.remove('success-glow');
+              setInstruction("All three-point balances complete!");
+              stage = 'done';
+            }, 5000);
+          }
+        } else {
+          // Still trying, but not yet 3 seconds
+          checkInabilityTimer();
+        }
+      }
+    });
+
+    async function startTracking(){
+      startButton.disabled = true; 
+      startButton.textContent = 'Starting…';
+      resizeCanvas();
+      const camOpts = { 
+        onFrame: async()=>{ await pose.send({ image: video }); }, 
+        width: 960, 
+        height: 720 
+      };
+      camera = new Camera(video, camOpts);
+      camera.start();
+      stage = 'run';
+      currentPose = 1;
+      usedSupportSets = []; // reset used supports
+      setInstruction(poses[0].text);
+      resetTimer();
+
+      // start inability timer for Pose 1
+      inabilityStart = Date.now();
+      strengthMsgShown = false;
+
+      startButton.textContent = 'Running';
+      setTimeout(()=>{ startButton.disabled = false; }, 600);
+    }
+
+    function stopCamera(){
+      if(video.srcObject){
+        video.srcObject.getTracks().forEach(t=>t.stop());
+        video.srcObject = null;
+      }
+      if(camera && camera.stop){
+        try{ camera.stop(); }catch(e){}
+        camera = null;
+      }
+    }
+
+    startButton.addEventListener('click', startTracking);
+    resetButton.addEventListener('click', ()=>{
+      setInstruction('Press Start to begin.');
+      stage = 'idle'; 
+      resetTimer(); 
+      stopCamera();
+      setFeedback('');
+      usedSupportSets = [];
+      detectStillness.prev = null;
+      canvas.classList.remove('success-glow');
+      inabilityStart = null;
+      strengthMsgShown = false;
+    });
+  </script>
+</body>
+</html>
